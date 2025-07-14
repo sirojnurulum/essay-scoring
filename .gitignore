@@ -1,7 +1,17 @@
+.vscode/
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
+*.pyc
+.DS_Store
+
+# Virtual Environment
+venv/
+
+*.sql
 
 # C extensions
 *.so

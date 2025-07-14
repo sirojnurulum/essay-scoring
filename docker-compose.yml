@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  scorer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: essay_scorer_api
+    ports:
+      - "8000:80"
+    volumes:
+      # This volume mount allows you to update the model file on your host
+      # and have it reflected in the container after a simple restart.
+      - ./app/models:/code/app/models
+    restart: unless-stopped

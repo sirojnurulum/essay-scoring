@@ -9,13 +9,15 @@ PIP := $(VENV_DIR)/bin/pip3
 .DEFAULT_GOAL := help
 
 # Phony targets are not files, they are commands
-.PHONY: help setup install train run clean docker-build docker-up docker-down docker-logs
+.PHONY: help setup install train train-next update-models run clean docker-build docker-up docker-down docker-logs
 
 help:
 	@echo "Available commands:"
 	@echo "  setup          - Create virtual environment and install dependencies"
 	@echo "  install        - Install/update dependencies from requirements.txt"
-	@echo "  train          - Run the model training script"
+	@echo "  train          - Run the model training script (skips existing models)"
+	@echo "  train-next     - Train the next single model that hasn't been trained yet"
+	@echo "  update-models  - Force re-training of all models"
 	@echo "  run            - Run the FastAPI server locally for development"
 	@echo "  clean          - Remove virtual environment and cache files"
 	@echo "  docker-build   - Build the Docker image for the application"
@@ -39,8 +41,16 @@ install:
 	@echo ">>> Dependencies installed."
 
 train:
-	@echo ">>> Running model training script..."
+	@echo ">>> Running model training script (skipping existing models)..."
 	@. $(VENV_DIR)/bin/activate; $(PYTHON) training/train.py
+
+train-next:
+	@echo ">>> Training the next available model..."
+	@. $(VENV_DIR)/bin/activate; $(PYTHON) training/train.py --train-next
+
+update-models:
+	@echo ">>> Forcing re-training of all models..."
+	@. $(VENV_DIR)/bin/activate; $(PYTHON) training/train.py --force-update
 
 run:
 	@echo ">>> Starting FastAPI server locally on http://127.0.0.1:8000"

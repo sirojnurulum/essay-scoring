@@ -4,3 +4,7 @@ scikit-learn
 pandas
 joblib
 numpy
+mysql-connector-python
+python-dotenv
+stop-words
+SQLAlchemy

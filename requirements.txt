@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+tqdm
 scikit-learn
 pandas
 joblib
@@ -8,3 +9,6 @@ mysql-connector-python
 python-dotenv
 stop-words
 SQLAlchemy
+xgboost
+tensorflow
+protobuf

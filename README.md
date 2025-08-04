@@ -1,47 +1,51 @@
 # Sistem Penilaian Esai Otomatis
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-brightgreen)
 ![Scikit-learn](https://img.shields.io/badge/scikit--learn-1.3.2-orange)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13-ff6f00)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
-Proyek ini adalah sebuah API yang dibangun dengan FastAPI untuk melakukan penilaian esai secara otomatis. Sistem menggunakan model Machine Learning untuk memprediksi skor jawaban siswa berdasarkan perbandingannya dengan kunci jawaban referensi.
+Proyek ini adalah sebuah API yang dibangun dengan FastAPI untuk melakukan penilaian esai secara otomatis. Sistem ini mendukung dua jenis model Machine Learning: **XGBoost** (cepat dan efisien) dan **Deep Learning** (potensi akurasi lebih tinggi), yang dapat dipilih melalui konfigurasi.
 
 ---
 
 ## Daftar Isi
 
 - [Sistem Penilaian Esai Otomatis](#sistem-penilaian-esai-otomatis)
-	- [Daftar Isi](#daftar-isi)
-	- [Tentang Proyek](#tentang-proyek)
-		- [Cara Kerja](#cara-kerja)
-		- [Teknologi yang Digunakan](#teknologi-yang-digunakan)
-	- [Memulai](#memulai)
-		- [Prasyarat](#prasyarat)
-		- [Instalasi](#instalasi)
-	- [Penggunaan](#penggunaan)
-		- [Melatih Model](#melatih-model)
-		- [Menjalankan API](#menjalankan-api)
-		- [Contoh Permintaan API](#contoh-permintaan-api)
-	- [Struktur Proyek](#struktur-proyek)
-	- [Daftar Perintah Makefile](#daftar-perintah-makefile)
+  - [Daftar Isi](#daftar-isi)
+  - [Tentang Proyek](#tentang-proyek)
+    - [Cara Kerja](#cara-kerja)
+    - [Teknologi yang Digunakan](#teknologi-yang-digunakan)
+  - [Memulai](#memulai)
+    - [Prasyarat](#prasyarat)
+    - [Instalasi](#instalasi)
+  - [Penggunaan](#penggunaan)
+    - [Melatih Model](#melatih-model)
+      - [Model XGBoost](#model-xgboost)
+    - [Menjalankan API](#menjalankan-api)
+    - [Contoh Permintaan API](#contoh-permintaan-api)
+  - [Struktur Proyek](#struktur-proyek)
+  - [Daftar Perintah Makefile](#daftar-perintah-makefile)
 
 ---
 
 ## Tentang Proyek
 
-Tujuan utama proyek ini adalah untuk mengotomatisasi proses penilaian esai, memberikan skor yang konsisten dan objektif berdasarkan data. API ini dapat diintegrasikan ke dalam sistem e-learning atau platform ujian online.
+Tujuan utama proyek ini adalah untuk mengotomatisasi proses penilaian esai, memberikan skor yang konsisten dan objektif. API ini dapat diintegrasikan ke dalam sistem e-learning atau platform ujian online, dengan fleksibilitas untuk memilih arsitektur model yang paling sesuai.
 
 ### Cara Kerja
 
-1.  **Pelatihan**: Untuk setiap mata pelajaran dan tingkat kelas, sebuah model dilatih menggunakan data historis. Fitur utama diekstraksi dengan menghitung kemiripan kosinus (cosine similarity) antara jawaban siswa dan sekumpulan jawaban referensi menggunakan TF-IDF. Model `LinearRegression` dari scikit-learn kemudian dilatih pada fitur-fitur ini.
-2.  **Penyimpanan Model**: Setiap model yang telah dilatih (termasuk vectorizer TF-IDF) disimpan sebagai satu file `.joblib` di dalam direktori `app/models/`.
-3.  **Penilaian**: Endpoint `/score` menerima detail esai (mata pelajaran, tingkat kelas, ID pertanyaan, dan teks jawaban). API akan memuat model yang sesuai, mengambil jawaban referensi dari database, melakukan rekayasa fitur yang sama seperti saat pelatihan, dan mengembalikan skor yang diprediksi.
+1.  **Orkestrasi Pelatihan**: Skrip `training/train.py` bertindak sebagai orkestrator. Ia menggunakan `DataManager` untuk mengambil data dari database.
+2.  **Rekayasa Fitur**: Untuk setiap grup data, `FeatureEngineer` digunakan untuk membuat fitur numerik berdasarkan kemiripan kosinus (cosine similarity) antara jawaban siswa dan jawaban referensi menggunakan TF-IDF.
+3.  **Pelatihan & Evaluasi Model**: `ModelTrainer` yang sesuai (misalnya, `XGBoostTrainer` atau `DeepLearningTrainer`) dipanggil. Kelas ini menangani evaluasi (seperti GridSearchCV atau Cross-Validation) dan melatih model final.
+4.  **Penyimpanan Artefak**: `FeatureEngineer` yang telah di-fit dan model yang telah dilatih disimpan sebagai artefak terpisah di dalam direktori `app/models/` yang sesuai.
+5.  **Penilaian via API**: Saat startup, API (`app/main.py`) memuat artefak model yang relevan berdasarkan variabel lingkungan `MODEL_TYPE`. Endpoint `/score` menggunakan `FeatureEngineer` untuk memproses input baru dan model untuk menghasilkan prediksi skor.
 
 ### Teknologi yang Digunakan
 
 - **Backend**: FastAPI
-- **Machine Learning**: Scikit-learn, Pandas, NumPy
+- **Machine Learning**: Scikit-learn, Pandas, NumPy, XGBoost, TensorFlow/Keras
 - **Database**: MySQL (diakses melalui SQLAlchemy)
 - **Otomatisasi**: GNU Make
 - **Kontainerisasi**: Docker, Docker Compose
@@ -68,7 +72,8 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini secara lokal.
 
 2.  **Buat dan konfigurasikan file lingkungan:**
     Salin file contoh `.env.example` menjadi `.env` dan isi dengan kredensial database Anda.
-    ```sh
+    **Penting:** Atur variabel `MODEL_TYPE` ke `xgboost` atau `deep-learning` untuk menentukan model mana yang akan digunakan oleh API.
+	```sh
     cp .env.example .env
     ```
     Edit file `.env` dengan editor teks favorit Anda.
@@ -85,9 +90,10 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini secara lokal.
 
 ### Melatih Model
 
-Sebelum menjalankan API, Anda harus melatih setidaknya satu model.
+Anda dapat melatih model XGBoost atau Deep Learning secara terpisah.
 
-- **Latih semua model yang belum ada:**
+#### Model XGBoost
+- **Latih semua model XGBoost yang belum ada:**
   ```sh
   make train
   ```
@@ -160,6 +166,7 @@ essay-scoring/
 ├── .env.example        # Template untuk file variabel lingkungan
 ├── Dockerfile          # Instruksi untuk membangun image Docker
 ├── docker-compose.yml  # Konfigurasi untuk menjalankan layanan dengan Docker
+├── logs/               # Direktori untuk file log (dibuat otomatis)
 ├── Makefile            # Perintah otomatisasi untuk pengembangan
 └── requirements.txt    # Daftar dependensi Python
 ```

@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from app.logger_config import setup_logger
 from .data_manager import DataManager
+from .utils import create_safe_group_name
 from .model_trainer import XGBoostTrainer, DeepLearningTrainer
 
 load_dotenv()
@@ -60,9 +61,7 @@ def run_training_pipeline(model_type, force_update=False, single_mode=False):
         # Loop through each group, fetch its specific data, and train
         for subject_name, grade_level in training_groups:
             # Construct the expected model filename to check for its existence.
-            safe_subject_name_check = subject_name.replace(' ', '_').lower()
-            safe_grade_level_check = grade_level.replace(' ', '_').lower()
-            model_group_name_check = f'{safe_subject_name_check}--{safe_grade_level_check}'
+            model_group_name_check = create_safe_group_name(subject_name, grade_level)
             model_path_check = os.path.join(os.path.dirname(__file__), '..', 'app', 'models', model_type, model_group_name_check)
 
             model_exists = os.path.exists(model_path_check)
@@ -100,6 +99,9 @@ def run_training_pipeline(model_type, force_update=False, single_mode=False):
             if reference_df.empty:
                 logger.warning(f"No reference answers found for '{subject_name} - {grade_level}'. Skipping training for this group.")
                 continue
+
+            # Export the fetched data to an Excel file for manual review
+            data_manager.export_data_to_excel(training_df, reference_df, subject_name, grade_level)
 
             trainer = get_trainer(model_type, subject_name, grade_level)
             trainer.train(training_df, reference_df)

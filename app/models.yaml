@@ -1,0 +1,18 @@
+# This file acts as a manifest for all available scoring models.
+# It decouples the application logic from the filesystem naming conventions.
+#
+# Add a new entry for each model that has been trained and is ready for deployment.
+# - subject: The user-facing name of the subject (e.g., "Bahasa Indonesia").
+# - grade_level: The user-facing name of the grade (e.g., "XI").
+# - path: The directory name within `app/models/{model_type}/` where the model artifacts are stored.
+
+models: []
+
+# Example of a populated list:
+# models:
+#   - subject: "Bahasa Indonesia"
+#     grade_level: "XI"
+#     path: "bahasa_indonesia--xi"
+#   - subject: "Matematika"
+#     grade_level: "XII"
+#     path: "matematika--xii"

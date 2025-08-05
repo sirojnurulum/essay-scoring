@@ -21,12 +21,7 @@ Proyek ini adalah sebuah API yang dibangun dengan FastAPI untuk melakukan penila
     - [Prasyarat](#prasyarat)
     - [Instalasi](#instalasi)
   - [Penggunaan](#penggunaan)
-    - [Melatih Model](#melatih-model)
-      - [Model XGBoost](#model-xgboost)
-    - [Menjalankan API](#menjalankan-api)
-    - [Contoh Permintaan API](#contoh-permintaan-api)
-  - [Struktur Proyek](#struktur-proyek)
-  - [Daftar Perintah Makefile](#daftar-perintah-makefile)
+    - [Menghasilkan Jawaban Baru (Opsional)](#menghasilkan-jawaban-baru-opsional)
 
 ---
 
@@ -40,12 +35,14 @@ Tujuan utama proyek ini adalah untuk mengotomatisasi proses penilaian esai, memb
 2.  **Rekayasa Fitur**: Untuk setiap grup data, `FeatureEngineer` digunakan untuk membuat fitur numerik berdasarkan kemiripan kosinus (cosine similarity) antara jawaban siswa dan jawaban referensi menggunakan TF-IDF.
 3.  **Pelatihan & Evaluasi Model**: `ModelTrainer` yang sesuai (misalnya, `XGBoostTrainer` atau `DeepLearningTrainer`) dipanggil. Kelas ini menangani evaluasi (seperti GridSearchCV atau Cross-Validation) dan melatih model final.
 4.  **Penyimpanan Artefak**: `FeatureEngineer` yang telah di-fit dan model yang telah dilatih disimpan sebagai artefak terpisah di dalam direktori `app/models/` yang sesuai.
-5.  **Penilaian via API**: Saat startup, API (`app/main.py`) memuat artefak model yang relevan berdasarkan variabel lingkungan `MODEL_TYPE`. Endpoint `/score` menggunakan `FeatureEngineer` untuk memproses input baru dan model untuk menghasilkan prediksi skor.
+5.  **Ekspor Data**: Selama proses pelatihan, data mentah yang diambil dari database untuk setiap grup diekspor ke file Excel di direktori `data_exports/` untuk tujuan inspeksi dan analisis manual.
+6.  **Penilaian via API**: Saat startup, API (`app/main.py`) memuat artefak model yang relevan berdasarkan variabel lingkungan `MODEL_TYPE`. Endpoint `/score` menggunakan `FeatureEngineer` untuk memproses input baru dan model untuk menghasilkan prediksi skor.
 
 ### Teknologi yang Digunakan
 
 - **Backend**: FastAPI
 - **Machine Learning**: Scikit-learn, Pandas, NumPy, XGBoost, TensorFlow/Keras
+- **Generative AI**: Google Gemini Pro
 - **Database**: MySQL (diakses melalui SQLAlchemy)
 - **Otomatisasi**: GNU Make
 - **Kontainerisasi**: Docker, Docker Compose
@@ -58,7 +55,8 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini secara lokal.
 
 ### Prasyarat
 
-- Python 3.10+
+- Python 3.11+
+- [Poetry](https://python-poetry.org/docs/#installation) untuk manajemen dependensi
 - `make` (biasanya sudah terinstal di Linux/macOS)
 - Docker & Docker Compose (opsional, untuk menjalankan via kontainer)
 
@@ -72,14 +70,16 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini secara lokal.
 
 2.  **Buat dan konfigurasikan file lingkungan:**
     Salin file contoh `.env.example` menjadi `.env` dan isi dengan kredensial database Anda.
-    **Penting:** Atur variabel `MODEL_TYPE` ke `xgboost` atau `deep-learning` untuk menentukan model mana yang akan digunakan oleh API.
+    **Penting:**
+    - Atur variabel `MODEL_TYPE` ke `xgboost` atau `deep-learning` untuk menentukan model mana yang akan digunakan oleh API.
+    - Jika Anda ingin menggunakan fitur pembuatan jawaban, isi `GEMINI_API_KEY` dengan API key dari Google AI Studio.
 	```sh
     cp .env.example .env
     ```
     Edit file `.env` dengan editor teks favorit Anda.
 
-3.  **Setup lingkungan virtual dan instal dependensi:**
-    Perintah ini akan membuat lingkungan virtual Python di dalam direktori `venv/` dan menginstal semua paket yang dibutuhkan dari `requirements.txt`.
+3.  **Instal dependensi:**
+    Perintah ini akan secara otomatis membuat lingkungan virtual di dalam direktori proyek (`.venv/`) dan menginstal semua paket yang dibutuhkan menggunakan Poetry.
     ```sh
     make setup
     ```
@@ -88,104 +88,8 @@ Ikuti langkah-langkah berikut untuk menjalankan proyek ini secara lokal.
 
 ## Penggunaan
 
-### Melatih Model
+### Menghasilkan Jawaban Baru (Opsional)
 
-Anda dapat melatih model XGBoost atau Deep Learning secara terpisah.
-
-#### Model XGBoost
-- **Latih semua model XGBoost yang belum ada:**
-  ```sh
-  make train
-  ```
-- **Latih satu model berikutnya secara manual:**
-  Perintah ini akan melatih satu model yang belum ada, lalu berhenti. Jalankan berulang kali untuk melatih satu per satu.
-  ```sh
-  make train-next
-  ```
-- **Paksa pelatihan ulang semua model:**
-  ```sh
-  make update-models
-  ```
-
-### Menjalankan API
-
-- **Mode Pengembangan (Lokal):**
-  Menjalankan server menggunakan Uvicorn dengan fitur *hot-reload*.
-  ```sh
-  make run
-  ```
-  API akan tersedia di `http://127.0.0.1:8000`.
-
-- **Mode Produksi (Docker):**
-  Membangun dan menjalankan aplikasi di dalam kontainer Docker.
-  ```sh
-  make docker-up
-  ```
-  API akan tersedia di `http://localhost:8000`.
-
-Setelah server berjalan, Anda dapat mengakses dokumentasi API interaktif di `http://localhost:8000/docs`.
-
-### Contoh Permintaan API
-
-Anda dapat menggunakan `curl` untuk menguji endpoint `/score`:
-
+Anda dapat menggunakan AI untuk membuat jawaban referensi berkualitas tinggi untuk semua soal di database Anda.
 ```sh
-curl -X 'POST' \
-  'http://127.0.0.1:8000/score' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "subject": "biologi",
-  "grade_level": "kelas xii",
-  "question_id": 123,
-  "answer_text": "Mitokondria adalah organel sel yang berfungsi sebagai tempat respirasi seluler."
-}'
-```
-
-**Contoh Respons:**
-```json
-{
-  "score": 8.75
-}
-```
-
----
-
-## Struktur Proyek
-
-```
-essay-scoring/
-├── app/
-│   ├── models/         # Direktori untuk menyimpan file model (.joblib)
-│   └── main.py         # Logika utama aplikasi FastAPI
-├── queries/
-│   ├── get_reference_answers.sql # Kueri untuk mengambil jawaban referensi
-│   └── get_training_data.sql     # Kueri untuk mengambil data pelatihan
-├── training/
-│   └── train.py        # Skrip untuk melatih model
-├── .env.example        # Template untuk file variabel lingkungan
-├── Dockerfile          # Instruksi untuk membangun image Docker
-├── docker-compose.yml  # Konfigurasi untuk menjalankan layanan dengan Docker
-├── logs/               # Direktori untuk file log (dibuat otomatis)
-├── Makefile            # Perintah otomatisasi untuk pengembangan
-└── requirements.txt    # Daftar dependensi Python
-```
-
----
-
-## Daftar Perintah Makefile
-
-| Perintah          | Deskripsi                                                              |
-|-------------------|------------------------------------------------------------------------|
-| `make help`       | Menampilkan daftar semua perintah yang tersedia.                       |
-| `make setup`      | Membuat lingkungan virtual dan menginstal semua dependensi.            |
-| `make install`    | Menginstal atau memperbarui dependensi dari `requirements.txt`.        |
-| `make train`      | Menjalankan skrip pelatihan (melewatkan model yang sudah ada).         |
-| `make train-next` | Melatih satu model berikutnya yang belum ada, lalu berhenti.           |
-| `make update-models`| Memaksa pelatihan ulang semua model dari awal.                         |
-| `make run`        | Menjalankan server FastAPI secara lokal untuk pengembangan.            |
-| `make clean`      | Menghapus lingkungan virtual dan file cache.                           |
-| `make docker-build` | Membangun image Docker untuk aplikasi.                                 |
-| `make docker-up`  | Menjalankan aplikasi menggunakan Docker Compose.                       |
-| `make docker-down`| Menghentikan dan menghapus kontainer aplikasi.                         |
-| `make docker-logs`| Menampilkan log dari kontainer yang sedang berjalan.                   |
+make generate-answers

@@ -15,9 +15,13 @@ import tensorflow as tf
 from xgboost import XGBRegressor
 
 from app.feature_engineering import FeatureEngineer
+from .utils import create_safe_group_name
 from app.logger_config import setup_logger
 
 logger = setup_logger()
+
+# Constants for model training
+DL_MAX_EPOCHS = 50
 
 
 class BaseModelTrainer:
@@ -31,10 +35,8 @@ class BaseModelTrainer:
         self.model = None
 
         # Define the output directory for model artifacts
-        safe_subject = subject_name.replace(' ', '_').lower()
-        safe_grade = grade_level.replace(' ', '_').lower()
-        model_group_name = f'{safe_subject}--{safe_grade}'
-        self.model_dir = os.path.join(os.path.dirname(__file__), '..', 'app', 'models', model_type, model_group_name)
+        safe_group_name = create_safe_group_name(self.subject_name, self.grade_level)
+        self.model_dir = os.path.join(os.path.dirname(__file__), '..', 'app', 'models', self.model_type, safe_group_name)
         os.makedirs(self.model_dir, exist_ok=True)
 
     def train(self, training_df, reference_df):
@@ -114,7 +116,7 @@ class DeepLearningTrainer(BaseModelTrainer):
             
             eval_model = self._build_model(input_shape=(X_train_fold.shape[1],))
             # Use 10% of the fold's training data as a validation set for early stopping.
-            eval_model.fit(X_train_fold, y_train_fold, epochs=50, batch_size=32, verbose=0, validation_split=0.1, callbacks=[early_stopping_callback])
+            eval_model.fit(X_train_fold, y_train_fold, epochs=DL_MAX_EPOCHS, batch_size=32, verbose=0, validation_split=0.1, callbacks=[early_stopping_callback])
             preds = eval_model.predict(X_val_fold).flatten()
             cv_scores.append(mean_absolute_error(y_val_fold, preds))
         logger.info(f"Cross-Validation Complete. Mean Absolute Error: {np.mean(cv_scores):.4f} (+/- {np.std(cv_scores):.4f})")
@@ -128,7 +130,7 @@ class DeepLearningTrainer(BaseModelTrainer):
             monitor='val_loss', patience=5, restore_best_weights=True
         )
         # Use 10% of the full training data for validation during final training.
-        self.model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=1, validation_split=0.1, callbacks=[early_stopping_callback])
+        self.model.fit(X_train, y_train, epochs=DL_MAX_EPOCHS, batch_size=32, verbose=1, validation_split=0.1, callbacks=[early_stopping_callback])
 
     def _save_artifacts(self):
         joblib.dump(self.feature_engineer, os.path.join(self.model_dir, 'feature_engineer.joblib'))

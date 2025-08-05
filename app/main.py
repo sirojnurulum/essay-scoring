@@ -16,6 +16,7 @@ import joblib
 import pandas as pd
 import numpy as np
 import os
+import yaml
 from sqlalchemy import create_engine
 import tensorflow as tf
 from dotenv import load_dotenv
@@ -41,6 +42,7 @@ MODEL_TYPE = os.getenv('MODEL_TYPE', 'xgboost').lower()
 
 # Define the absolute path to the directory where models are stored
 MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models', MODEL_TYPE)
+MODELS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'models.yaml')
 # Global dictionary to cache loaded models in memory. Key: (subject, grade_level)
 models = {}
 # Global SQLAlchemy engine for database connections. Initialized at startup.
@@ -49,48 +51,59 @@ engine = None
 
 def _load_all_models():
     """
-    Scans the appropriate models directory based on MODEL_TYPE, loads all
-    model assets into memory, and populates the global `models` dictionary.
+    Loads all model assets into memory based on the `models.yaml` manifest.
+
+    This function reads the central YAML configuration, iterates through the
+    defined models, and loads the corresponding artifacts (feature engineer
+    and model file) into the global `models` dictionary.
 
     Raises:
-        RuntimeError: If the models directory does not exist.
+        RuntimeError: If the `models.yaml` file or a specified model
+                      directory does not exist.
     """
     global models
     logger.info(f"--- Loading models of type: {MODEL_TYPE.upper()} ---")
-    if not os.path.isdir(MODELS_DIR):
-        raise RuntimeError(
-            f"Models directory not found: {MODELS_DIR}. Please train '{MODEL_TYPE}' models first."
-        )
 
-    for model_dir_name in os.listdir(MODELS_DIR):
+    if not os.path.exists(MODELS_CONFIG_PATH):
+        raise RuntimeError(f"Model configuration file not found: {MODELS_CONFIG_PATH}")
+
+    with open(MODELS_CONFIG_PATH, 'r') as f:
+        config = yaml.safe_load(f)
+
+    if not config.get('models'):
+        logger.warning("No models are defined in models.yaml. The API will start without any models.")
+        return
+
+    for model_info in config['models']:
+        subject = model_info['subject']
+        grade = model_info['grade_level']
+        model_dir_name = model_info['path']
         model_path = os.path.join(MODELS_DIR, model_dir_name)
-        if os.path.isdir(model_path):
-            try:
-                # Directory name format: {subject}--{grade_level}
-                parts = model_dir_name.split("--")
-                if len(parts) != 2: continue
 
-                subject = parts[0].replace('_', ' ')
-                grade = parts[1].replace('_', ' ')
-                # Create a standardized key for the dictionary
-                model_key = (subject.lower(), grade.lower())
+        if not os.path.isdir(model_path):
+            logger.error(f"Directory '{model_dir_name}' specified in models.yaml not found at '{model_path}'. Skipping.")
+            continue
 
-                if MODEL_TYPE == 'xgboost':
-                    # Load the entire scikit-learn pipeline
-                    feature_engineer = joblib.load(os.path.join(model_path, 'feature_engineer.joblib'))
-                    model = joblib.load(os.path.join(model_path, 'model.joblib'))
-                    models[model_key] = {'feature_engineer': feature_engineer, 'model': model}
-                elif MODEL_TYPE == 'deep-learning':
-                    # Load vectorizer and Keras model separately
-                    feature_engineer = joblib.load(os.path.join(model_path, 'feature_engineer.joblib'))
-                    model = tf.keras.models.load_model(os.path.join(model_path, 'model.keras'))
-                    models[model_key] = {'feature_engineer': feature_engineer, 'model': model}
-                
-                logger.info(f"Loaded model for: '{subject.title()} - {grade.title()}'")
-            except Exception as e:
-                logger.warning(f"Could not load model from directory '{model_dir_name}'. Reason: {e}")
+        try:
+            model_key = (subject.lower(), grade.lower())
+
+            if MODEL_TYPE == 'xgboost':
+                feature_engineer = joblib.load(os.path.join(model_path, 'feature_engineer.joblib'))
+                model = joblib.load(os.path.join(model_path, 'model.joblib'))
+                models[model_key] = {'feature_engineer': feature_engineer, 'model': model}
+            elif MODEL_TYPE == 'deep-learning':
+                feature_engineer = joblib.load(os.path.join(model_path, 'feature_engineer.joblib'))
+                model = tf.keras.models.load_model(os.path.join(model_path, 'model.keras'))
+                models[model_key] = {'feature_engineer': feature_engineer, 'model': model}
+
+            logger.info(f"Loaded model for: '{subject.title()} - {grade.title()}' from '{model_dir_name}'")
+        except FileNotFoundError as e:
+            logger.warning(f"Could not load model from directory '{model_dir_name}'. A required file is missing: {e}. Skipping.")
+        except Exception as e:
+            logger.warning(f"An unexpected error occurred while loading model from '{model_dir_name}'. Reason: {e}. Skipping.")
+
     if not models:
-        logger.warning("No models were found in the models directory.")
+        logger.warning("No models were successfully loaded. Please check the configuration and model directories.")
 
 
 @app.on_event("startup")

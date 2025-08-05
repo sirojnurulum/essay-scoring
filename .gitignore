@@ -12,6 +12,8 @@ __pycache__/
 venv/
 .venv/
 /logs/
+/data_exports/
+/generated_data/
 
 # C extensions
 *.so
@@ -213,6 +215,9 @@ cython_debug/
 
 # Custom Ignores
 *.sql
+
+# Gemini
+gemini.md
 
 # Marimo
 marimo/_static/
